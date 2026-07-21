@@ -7489,7 +7489,7 @@
     if(!toast){
       toast = document.createElement('div');
       toast.id = 'mini-toast';
-      toast.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#f3d98a;padding:8px 16px;border-radius:20px;font-size:12.5px;font-weight:700;z-index:11400;opacity:0;transition:opacity .25s ease;pointer-events:none;white-space:nowrap;';
+      toast.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#f3d98a;padding:8px 16px;border-radius:20px;font-size:12.5px;font-weight:700;z-index:11400;opacity:0;transition:opacity .25s ease;pointer-events:none;max-width:calc(100vw - 32px);width:max-content;white-space:normal;word-wrap:break-word;text-align:center;box-sizing:border-box;';
       document.body.appendChild(toast);
     }
     toast.textContent = msg;
@@ -7505,7 +7505,7 @@
     if(!toast){
       toast = document.createElement('div');
       toast.id = 'mini-toast';
-      toast.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#f3d98a;padding:8px 16px;border-radius:20px;font-size:12.5px;font-weight:700;z-index:11400;opacity:0;transition:opacity .25s ease;pointer-events:none;white-space:nowrap;';
+      toast.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#f3d98a;padding:8px 16px;border-radius:20px;font-size:12.5px;font-weight:700;z-index:11400;opacity:0;transition:opacity .25s ease;pointer-events:none;max-width:calc(100vw - 32px);width:max-content;white-space:normal;word-wrap:break-word;text-align:center;box-sizing:border-box;';
       document.body.appendChild(toast);
     }
     clearTimeout(toast._t);
@@ -11074,13 +11074,129 @@
   // entrando de a poco durante un crossfade dispare cambios de estado antes de tiempo)
   function sharedPlayerStateChange(e){
     if(e.target !== globalPlayer) return;
-    if(e.data === 1){ globalIsPlaying = true; refreshRowPlayIcons(); } // 1 = YT.PlayerState.PLAYING
-    else if(e.data === 2){ globalIsPlaying = false; refreshRowPlayIcons(); } // 2 = PAUSED
+    if(e.data === 1){ globalIsPlaying = true; refreshRowPlayIcons(); updateLockScreenPlayState(); } // 1 = YT.PlayerState.PLAYING
+    else if(e.data === 2){ globalIsPlaying = false; refreshRowPlayIcons(); updateLockScreenPlayState(); } // 2 = PAUSED
     else if(e.data === 0){ // 0 = ENDED
       if(crossfadeState) return; // el crossfade ya se está encargando de pasar a la siguiente
       playNextInQueue();
     }
   }
+
+  // ============================================================
+  // Reproducción en segundo plano + controles en pantalla de bloqueo (Android).
+  // Solo existen dentro de la APK nativa (Capacitor) — en el navegador o como
+  // PWA de Netlify estos plugins no están presentes y todo esto se ignora solo.
+  // OJO: como el reproductor es el IFrame de YouTube (no audio nativo), Android
+  // puede seguir pausando el video al apagar la pantalla en algunos equipos —
+  // esto reduce muchísimo esa posibilidad, pero conviene probarlo en el celular
+  // real antes de darlo por sentado.
+  // ============================================================
+  function isNativeApp(){
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  }
+  function getBackgroundModePlugin(){ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundMode; }
+  function getMusicControlsPlugin(){ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorMusicControls; }
+
+  let backgroundModeEnabled = false;
+  let lockScreenControlsCreated = false;
+
+  // se activa la primera vez que suena una canción — evita que Android detenga
+  // el proceso de la app al bloquear la pantalla o minimizarla. Android exige
+  // mostrar una notificación fija mientras esto esté activo
+  async function ensureBackgroundModeEnabled(){
+    if(!isNativeApp() || backgroundModeEnabled) return;
+    const bg = getBackgroundModePlugin();
+    if(!bg) return;
+    try{ await bg.enable(); backgroundModeEnabled = true; }
+    catch(err){ console.error('No se pudo activar el modo de segundo plano', err); }
+  }
+  function disableBackgroundModeIfIdle(){
+    if(!isNativeApp() || !backgroundModeEnabled || currentSong) return;
+    const bg = getBackgroundModePlugin();
+    if(bg) bg.disable().catch(()=>{});
+    backgroundModeEnabled = false;
+  }
+
+  // crea/recrea la tarjeta de controles de bloqueo con la canción que suena
+  // ahora — se llama cada vez que CAMBIA la canción (no en cada pausa)
+  function syncLockScreenControls(){
+    if(!isNativeApp() || !currentSong) return;
+    const mc = getMusicControlsPlugin();
+    if(!mc) return;
+    const parts = songTitleParts(currentSong.title);
+    let duration = 0;
+    try{ if(globalPlayer) duration = globalPlayer.getDuration() || 0; }catch(err){}
+    mc.create({
+      track: parts.song || currentSong.title,
+      artist: parts.artist || '',
+      album: 'Zocial',
+      cover: playlistThumbUrl(currentSong.id),
+      isPlaying: globalIsPlaying,
+      dismissable: true,
+      hasPrev: currentQueueIndex > 0,
+      hasNext: currentQueueIndex >= 0 && currentQueueIndex + 1 < currentQueue.length,
+      hasClose: true,
+      duration: Math.round(duration) || 0
+    }).then(()=>{ lockScreenControlsCreated = true; })
+      .catch(err=>{ console.error('No se pudieron crear los controles de bloqueo', err); });
+  }
+
+  // se llama cada vez que cambia la canción (nueva canción cargada) — enciende
+  // el modo de fondo si hace falta y refresca la tarjeta de bloqueo
+  function onLockScreenSongChanged(){
+    ensureBackgroundModeEnabled();
+    syncLockScreenControls();
+  }
+
+  // solo actualiza el ícono ▶/❚❚ de los controles ya creados, sin recrear toda
+  // la tarjeta — se usa en cada pausa/reanudación (más liviano que syncLockScreenControls)
+  function updateLockScreenPlayState(){
+    if(!isNativeApp() || !lockScreenControlsCreated) return;
+    const mc = getMusicControlsPlugin();
+    if(mc) mc.updateIsPlaying({ isPlaying: globalIsPlaying }).catch(()=>{});
+  }
+
+  function destroyLockScreenControls(){
+    if(!isNativeApp() || !lockScreenControlsCreated) return;
+    const mc = getMusicControlsPlugin();
+    if(mc) mc.destroy().catch(()=>{});
+    lockScreenControlsCreated = false;
+  }
+
+  // conecta los botones de la notificación/pantalla de bloqueo con los MISMOS
+  // controles del mini-reproductor (respeta cola, aleatorio, repetir, etc.)
+  (function wireLockScreenControlEvents(){
+    if(!isNativeApp()) return;
+    const mc = getMusicControlsPlugin();
+    if(!mc) return;
+    mc.addListener('controlsNotification', (info)=>{
+      switch(info && info.message){
+        case 'music-controls-next':
+        case 'music-controls-skip-forward':
+          playNextInQueue(true);
+          break;
+        case 'music-controls-previous':
+        case 'music-controls-skip-backward':
+          playPreviousInQueue();
+          break;
+        case 'music-controls-pause':
+        case 'music-controls-media-button-pause':
+          if(globalPlayer && globalIsPlaying) globalPlayer.pauseVideo();
+          break;
+        case 'music-controls-play':
+        case 'music-controls-media-button-play':
+          if(globalPlayer && !globalIsPlaying) globalPlayer.playVideo();
+          break;
+        case 'music-controls-toggle-play-pause':
+        case 'music-controls-media-button-toggle-play-pause':
+          toggleGlobalPlayPause();
+          break;
+        case 'music-controls-destroy':
+          lockScreenControlsCreated = false;
+          break;
+      }
+    });
+  })();
 
   function createHiddenYTPlayer(YT){
     return new Promise(resolve=>{
@@ -11164,6 +11280,7 @@
     updateMiniPlayerUI();
     refreshRowPlayIcons();
     scrollPlayingRowIntoView();
+    onLockScreenSongChanged();
     crossfadeState = null;
   }
 
@@ -11192,6 +11309,7 @@
     player.loadVideoById(song.id);
     globalIsPlaying = true;
     refreshRowPlayIcons();
+    onLockScreenSongChanged();
   }
 
   // mantiene la canción que está sonando siempre visible y centrada en pantalla —
@@ -11282,6 +11400,8 @@
     miniPlayerProgressFill.style.width = '0%';
     updateMiniPlayerUI();
     refreshRowPlayIcons();
+    destroyLockScreenControls();
+    disableBackgroundModeIfIdle();
   }
 
   miniPlayerPlayPauseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); toggleGlobalPlayPause(); });
@@ -11861,4 +11981,3 @@
 </script>
 </body>
 </html>
-
