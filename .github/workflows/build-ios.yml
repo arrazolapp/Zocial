@@ -20,7 +20,7 @@ jobs:
           node-version: 22
 
       - name: Instalar dependencias del proyecto
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Sincronizar Capacitor con el proyecto iOS
         run: npx cap sync ios
@@ -44,3 +44,4 @@ jobs:
           cd ios/App
           xcodebuild -workspace App.xcworkspace -scheme App \
             -sdk iphonesimulator -configuration Debug build
+
