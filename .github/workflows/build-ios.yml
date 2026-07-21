@@ -1,0 +1,46 @@
+name: Compilar app de iOS
+
+# usa una máquina Mac de GitHub (gratis, con límite de minutos al mes) — así
+# compilas para iOS sin tener ni rentar una Mac tú mismo
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias del proyecto
+        run: npm install
+
+      - name: Sincronizar Capacitor con el proyecto iOS
+        run: npx cap sync ios
+
+      - name: Instalar CocoaPods (dependencias nativas de iOS)
+        run: cd ios/App && pod install
+
+      # ---------------------------------------------------------------
+      # OJO: esto compila una versión SIN FIRMAR, solo para comprobar que
+      # el proyecto compila bien (funciona en el Simulador de iOS). Para
+      # generar un .ipa que se pueda instalar en un iPhone real o subir a
+      # TestFlight/App Store, hace falta:
+      #   1) una cuenta de Apple Developer ($99/año), y
+      #   2) subir tu certificado de firma + perfil de aprovisionamiento
+      #      como "Secrets" de este repositorio.
+      # Cuando tengas la cuenta de Apple lista, dime y te dejo ese paso
+      # agregado aquí mismo.
+      # ---------------------------------------------------------------
+      - name: Compilar (sin firmar, para comprobar que compila / Simulador)
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App \
+            -sdk iphonesimulator -configuration Debug build
