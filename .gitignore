@@ -1,0 +1,15 @@
+# dependencias (se reinstalan solas con "npm install", no hace falta subirlas)
+node_modules/
+
+# resultados de compilación
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+
+# archivos del sistema
+.DS_Store
+*.log

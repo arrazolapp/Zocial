@@ -1,0 +1,20 @@
+{
+  "name": "zocial-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zocial — empaquetado para Android (APK) y iOS con Capacitor",
+  "scripts": {
+    "sync": "npx cap sync",
+    "android": "npx cap open android",
+    "ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/ios": "^8.4.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5"
+  }
+}
