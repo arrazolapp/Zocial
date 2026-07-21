@@ -4,6 +4,30 @@
 const CACHE_NAME = 'zocial-shell-v1';
 const SHELL_FILES = ['./index.html', './manifest.json'];
 
+// caché aparte solo para imágenes (fotos de artista, miniaturas de YouTube,
+// fotos subidas a Firebase Storage). Estas casi nunca cambian una vez creadas,
+// así que SÍ conviene guardarlas en el celular — es justo la "memoria" que
+// hace que la pestaña de música no vuelva a descargar todo cada vez que se abre
+const IMAGE_CACHE_NAME = 'zocial-images-v1';
+const IMAGE_HOST_PATTERNS = [
+  'img.youtube.com',
+  'i.ytimg.com',
+  'yt3.ggpht.com',
+  'yt3.googleusercontent.com',
+  'firebasestorage.googleapis.com',
+  'firebasestorage.app',
+];
+
+function isImageRequest(request) {
+  if (request.destination === 'image') return true;
+  try {
+    const url = new URL(request.url);
+    return IMAGE_HOST_PATTERNS.some((host) => url.hostname.includes(host));
+  } catch (e) {
+    return false;
+  }
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
@@ -14,16 +38,42 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => k !== CACHE_NAME && k !== IMAGE_CACHE_NAME)
+          .map((k) => caches.delete(k))
+      )
     )
   );
   self.clients.claim();
 });
 
-// estrategia "red primero, respaldo en caché" — así siempre se ve lo más
-// reciente cuando hay internet, y no se rompe del todo si se pierde la señal
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // ---- imágenes: "stale-while-revalidate" — se muestra al instante lo que ya
+  // está guardado en el celular, y de fondo se pide una copia nueva por si acaso
+  // cambió (sin bloquear lo que el usuario está viendo) ----
+  if (isImageRequest(event.request)) {
+    event.respondWith(
+      caches.open(IMAGE_CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          const networkFetch = fetch(event.request)
+            .then((response) => {
+              if (response && response.ok) cache.put(event.request, response.clone());
+              return response;
+            })
+            .catch(() => cached);
+          return cached || networkFetch;
+        })
+      )
+    );
+    return;
+  }
+
+  // ---- todo lo demás (HTML, contenido social, etc.): "red primero, respaldo en
+  // caché" — así siempre se ve lo más reciente cuando hay internet, y no se
+  // rompe del todo si se pierde la señal ----
   event.respondWith(
     fetch(event.request)
       .then((response) => {
