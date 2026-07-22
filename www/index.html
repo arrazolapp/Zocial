@@ -2044,6 +2044,7 @@
     color:#8f8677;transition:opacity .25s ease;
   }
   .artist-playlist-cover-loading svg{width:22px;height:22px;animation:pull-refresh-spin 1s linear infinite;}
+  .artist-playlist-cover-loading.load-failed svg{animation:none;opacity:.5;}
   .artist-playlist-cover-loading span{font-size:9.5px;font-weight:700;letter-spacing:.02em;text-align:center;padding:0 4px;}
   .artist-playlist-cover-img.is-loaded ~ .artist-playlist-cover-loading{opacity:0;pointer-events:none;}
   .artist-playlists-grid.list-view .artist-playlist-cover-loading span{display:none;} /* en vista de lista el círculo es chico: solo el ícono */
@@ -10153,8 +10154,14 @@
     artistList.forEach(artistGroup=>{
       const card = tpl.content.cloneNode(true).querySelector('.artist-playlist-card');
       const coverImg = card.querySelector('.artist-playlist-cover-img');
+      const coverLoading = card.querySelector('.artist-playlist-cover-loading');
       coverImg.addEventListener('load', ()=>{ coverImg.classList.add('is-loaded'); }, {once:true});
-      coverImg.addEventListener('error', ()=>{ coverImg.classList.add('is-loaded'); }, {once:true}); // si falla, no dejamos el spinner girando para siempre
+      coverImg.addEventListener('error', ()=>{
+        // si la imagen falla, NO la mostramos (se vería el ícono roto nativo) —
+        // dejamos el aviso, pero quieto y con otro texto en vez de "Cargando"
+        coverLoading.classList.add('load-failed');
+        coverLoading.querySelector('span').textContent = 'Imagen no disponible';
+      }, {once:true});
       coverImg.src = artistCoverUrl(artistGroup.songs, artistGroup.name);
       card.querySelector('.artist-playlist-name').textContent = artistGroup.name;
       card.querySelector('.artist-playlist-meta').textContent = `${artistGroup.songs.length} ${artistGroup.songs.length===1?'canción':'canciones'}`;

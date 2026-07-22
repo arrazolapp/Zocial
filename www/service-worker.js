@@ -51,22 +51,37 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // ---- imágenes: "stale-while-revalidate" — se muestra al instante lo que ya
-  // está guardado en el celular, y de fondo se pide una copia nueva por si acaso
-  // cambió (sin bloquear lo que el usuario está viendo) ----
+  // ---- imágenes: se muestra al instante lo que ya está guardado en el celular,
+  // y de fondo se pide una copia nueva por si acaso cambió. Todo envuelto en
+  // try/catch: si la API de caché falla en este WebView (pasa en algunos
+  // equipos Android), la imagen igual se pide directo a la red — nunca se
+  // rompe por culpa de la caché ----
   if (isImageRequest(event.request)) {
     event.respondWith(
-      caches.open(IMAGE_CACHE_NAME).then((cache) =>
-        cache.match(event.request).then((cached) => {
-          const networkFetch = fetch(event.request)
-            .then((response) => {
-              if (response && response.ok) cache.put(event.request, response.clone());
-              return response;
-            })
-            .catch(() => cached);
-          return cached || networkFetch;
-        })
-      )
+      (async () => {
+        try {
+          const cache = await caches.open(IMAGE_CACHE_NAME);
+          const cached = await cache.match(event.request);
+          if (cached) {
+            // ya la teníamos guardada: se devuelve al instante y, de fondo,
+            // se intenta traer una versión más nueva para la próxima vez
+            fetch(event.request)
+              .then((resp) => {
+                if (resp && resp.ok) cache.put(event.request, resp.clone()).catch(() => {});
+              })
+              .catch(() => {});
+            return cached;
+          }
+          const response = await fetch(event.request);
+          if (response && response.ok) {
+            cache.put(event.request, response.clone()).catch(() => {});
+          }
+          return response;
+        } catch (err) {
+          // la caché falló por lo que sea — no importa, se pide directo a la red
+          return fetch(event.request);
+        }
+      })()
     );
     return;
   }
@@ -78,7 +93,7 @@ self.addEventListener('fetch', (event) => {
     fetch(event.request)
       .then((response) => {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
         return response;
       })
       .catch(() => caches.match(event.request))
