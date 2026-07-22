@@ -274,6 +274,23 @@
   }
   #gallery-view{padding-top:48px;}
 
+  /* ---------- indicador de "jalar para actualizar" ---------- */
+  .pull-refresh-indicator{
+    position:fixed;top:56px;left:50%;
+    width:34px;height:34px;border-radius:50%;
+    background:rgba(20,20,24,.9);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;z-index:74;
+    transform:translate(-50%,-60px);opacity:0;
+    transition:transform .25s ease, opacity .25s ease;
+    pointer-events:none;
+  }
+  .pull-refresh-indicator svg{width:18px;height:18px;}
+  .pull-refresh-indicator.dragging{transition:none;}
+  .pull-refresh-indicator.spinning svg{animation:pull-refresh-spin .7s linear infinite;}
+  @keyframes pull-refresh-spin{ to{ transform:rotate(360deg); } }
+
   .stories-wrap{position:relative;}
   .stories-collapse{
     max-height:170px;overflow:hidden;
@@ -2531,6 +2548,9 @@
 
 <!-- ================= GALERÍA EN VIVO ================= -->
 <div class="view" id="gallery-view">
+  <div class="pull-refresh-indicator" id="pull-refresh-indicator">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+  </div>
   <div class="ig-header-fixed" id="ig-header-fixed">
     <div class="topbar ig-header">
       <h1 class="ig-logo">
@@ -8762,6 +8782,70 @@
     window.scrollTo({top:0, behavior:'smooth'});
     showToast('Publicaciones actualizadas ✓');
   }
+
+  // ============================================================
+  // Jalar hacia abajo para actualizar (pull-to-refresh), como en Instagram.
+  // Solo actúa cuando estamos en la galería Y ya se llegó arriba del todo del
+  // scroll — así no interfiere con el scroll normal del feed.
+  // ============================================================
+  (function setupPullToRefresh(){
+    const indicator = document.getElementById('pull-refresh-indicator');
+    const PULL_THRESHOLD = 70; // px que hay que jalar para que dispare la actualización
+    const MAX_PULL = 110;
+    let startY = 0;
+    let pulling = false;
+    let triggered = false;
+
+    function atTop(){
+      return (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
+    }
+
+    window.addEventListener('touchstart', (e)=>{
+      if(!galleryView.classList.contains('active')) return;
+      if(!atTop()) return;
+      pulling = true;
+      triggered = false;
+      startY = e.touches[0].clientY;
+      indicator.classList.add('dragging');
+    }, {passive:true});
+
+    window.addEventListener('touchmove', (e)=>{
+      if(!pulling) return;
+      const dy = e.touches[0].clientY - startY;
+      if(dy <= 0){ // ya no está jalando hacia abajo (o volvió a subir)
+        indicator.style.transform = 'translate(-50%,-60px)';
+        indicator.style.opacity = '0';
+        return;
+      }
+      const dist = Math.min(dy * 0.5, MAX_PULL); // resistencia, como el "rubber band" nativo
+      indicator.style.transform = `translate(-50%, ${dist - 60}px) rotate(${dist * 3}deg)`;
+      indicator.style.opacity = String(Math.min(dist / PULL_THRESHOLD, 1));
+      if(dist >= PULL_THRESHOLD && !triggered) triggered = true;
+    }, {passive:true});
+
+    function endPull(){
+      if(!pulling) return;
+      pulling = false;
+      indicator.classList.remove('dragging');
+      if(triggered){
+        indicator.classList.add('spinning');
+        indicator.style.transform = 'translate(-50%, 6px)';
+        indicator.style.opacity = '1';
+        refreshFeedView();
+        setTimeout(()=>{
+          indicator.classList.remove('spinning');
+          indicator.style.transform = 'translate(-50%,-60px)';
+          indicator.style.opacity = '0';
+        }, 700);
+      } else {
+        indicator.style.transform = 'translate(-50%,-60px)';
+        indicator.style.opacity = '0';
+      }
+      triggered = false;
+    }
+    window.addEventListener('touchend', endPull, {passive:true});
+    window.addEventListener('touchcancel', endPull, {passive:true});
+  })();
 
   document.getElementById('bn-home').addEventListener('click', ()=>{
     if(galleryView.classList.contains('active')){
