@@ -4280,14 +4280,15 @@
     }, 'image/jpeg', 0.9);
   });
 
-  // ya no hay una pantalla "home" con botón — la app entra directo a la galería
-  showView(galleryView);
+  // ya no hay una pantalla "home" con botón — la app entra directo a la galería.
+  // se difiere con setTimeout(0) para que corra DESPUÉS de que termine de
+  // inicializarse todo el script (si se llama aquí mismo, revienta porque
+  // showView() usa variables como reelState/feedReelState que se declaran más abajo)
+  setTimeout(()=>showView(galleryView), 0);
 
-  // si venimos de la cuenta regresiva (evento ya empezó), entra directo a la galería
+  // si venimos de la cuenta regresiva (evento ya empezó): ya entra a la galería por
+  // defecto de todos modos (línea de arriba), así que no hace falta nada aquí
   const urlParams = new URLSearchParams(window.location.search);
-  if(urlParams.get('ver') === 'galeria'){
-    showView(galleryView);
-  }
 
   // si venimos de la cuenta regresiva de la "sorpresa", entra directo a crear un reel: abre la galería
   // de Reels y lanza la cámara al instante (video, máx. 60 seg)
