@@ -4205,6 +4205,14 @@
     const storiesCollapseReset = document.getElementById('stories-collapse');
     if(storiesCollapseReset && view === galleryView) storiesCollapseReset.classList.remove('closed');
     setActiveNavButton(view);
+    // el reproductor a pantalla completa ya muestra sus propios controles, así que
+    // el mini-reproductor se esconde mientras esté abierto, y vuelve a aparecer al
+    // salir de ahí (si sigue sonando algo)
+    if(view === nowPlayingView){
+      miniPlayerEl.style.display = 'none';
+    } else {
+      updateMiniPlayerUI();
+    }
     // al entrar a Reels, se cierra y detiene el reproductor global de música — así el
     // usuario disfruta los reels sin que su audio compita con la música de "Tu música"
     if(view === reelsView && typeof closeGlobalPlayer === 'function'){
@@ -4361,15 +4369,14 @@
   });
 
   // ============================================================
-  // Botón "atrás" del celular (físico o gesto): en vez de sacar a la persona
-  // de la aplicación, cierra cualquier ventana/hoja abierta o la regresa a
-  // la galería principal (el "home" de publicaciones).
+  // Botón "atrás" (físico/gesto de Android, o el del navegador en la versión
+  // PWA): en vez de sacar a la persona de la aplicación, cierra cualquier
+  // ventana/hoja abierta o la regresa a la galería principal. Se comparte entre
+  // el navegador (popstate) y la APK nativa (@capacitor/app "backButton"),
+  // porque Capacitor NO intercepta el botón físico de Android por su cuenta —
+  // sin este registro, Android simplemente cierra la app entera.
   // ============================================================
-  history.pushState({app:true}, '', location.href);
-  window.addEventListener('popstate', ()=>{
-    // dejamos siempre una entrada "de repuesto" lista para el próximo "atrás"
-    history.pushState({app:true}, '', location.href);
-
+  function handleAppBackNavigation(atRootAction){
     const cameraOverlay = document.getElementById('camera-modal-overlay');
     if(cameraOverlay && cameraOverlay.classList.contains('show')){ closeCameraModal(); return; }
 
@@ -4385,10 +4392,36 @@
     const composeOverlayEl = document.getElementById('compose-message-overlay');
     if(composeOverlayEl && composeOverlayEl.classList.contains('show')){ composeOverlayEl.classList.remove('show'); return; }
 
+    // el reproductor a pantalla completa también cuenta como "una pantalla más"
+    // para volver, igual que cualquier otra vista
+    if(nowPlayingView.classList.contains('active')){
+      showView(viewBeforeNowPlaying || galleryView);
+      return;
+    }
+
     if(!galleryView.classList.contains('active')){
       showView(galleryView);
+      return;
     }
+
+    // ya estamos en la galería (la raíz) y no hay nada más abierto encima
+    atRootAction();
+  }
+
+  history.pushState({app:true}, '', location.href);
+  window.addEventListener('popstate', ()=>{
+    // dejamos siempre una entrada "de repuesto" lista para el próximo "atrás"
+    history.pushState({app:true}, '', location.href);
+    handleAppBackNavigation(()=>{}); // en el navegador, en la raíz no se hace nada (no hay "salir")
   });
+
+  // dentro de la APK nativa, el botón físico/gesto de Android no dispara
+  // popstate — hay que registrar el plugin @capacitor/app para interceptarlo
+  if(isNativeApp() && window.Capacitor.Plugins.App){
+    window.Capacitor.Plugins.App.addListener('backButton', ()=>{
+      handleAppBackNavigation(()=>{ window.Capacitor.Plugins.App.exitApp(); });
+    });
+  }
 
   // ============================================================
   // 2) COMPARTIR FOTO
