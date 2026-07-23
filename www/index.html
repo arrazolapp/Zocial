@@ -1960,7 +1960,7 @@
   .recent-shuffle-btn svg{width:18px;height:18px;}
   .recent-shuffle-btn.active{color:var(--music-accent);}
   .recent-playall-btn{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);
     background:#000;color:var(--music-accent);border:2px solid var(--music-accent);border-radius:18px;
     padding:8px 18px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;
     white-space:nowrap;
@@ -2907,7 +2907,6 @@
   <div class="content">
     <div class="playlists-tab-panel" id="playlists-tab-discover" style="display:none;">
       <div class="playlists-recent-row" id="discover-recent-row" style="display:none;">
-        <span>↓↑ Recientes</span>
         <button type="button" class="recent-playall-btn" id="discover-playall-btn">▶ Reproducir todas</button>
         <div class="recent-row-actions">
           <button type="button" class="recent-shuffle-btn" id="discover-shuffle-btn" aria-label="Reproducción aleatoria">
@@ -2930,7 +2929,6 @@
     </div>
     <div class="playlists-tab-panel" id="playlists-tab-mine" style="display:none;">
       <div class="playlists-recent-row" id="playlists-recent-row" style="display:none;">
-        <span>↓↑ Recientes</span>
         <button type="button" class="recent-playall-btn" id="playlists-playall-btn">▶ Reproducir todas</button>
         <div class="recent-row-actions">
           <button type="button" class="recent-shuffle-btn" id="playlists-shuffle-btn" aria-label="Reproducción aleatoria">
@@ -2950,7 +2948,6 @@
     </div>
     <div class="playlists-tab-panel" id="playlists-tab-artists">
       <div class="playlists-recent-row" id="artists-recent-row" style="display:none;">
-        <span>↓↑ Recientes</span>
         <button type="button" class="recent-playall-btn" id="artists-playall-btn">▶ Reproducir todas</button>
         <div class="recent-row-actions">
           <button type="button" class="recent-shuffle-btn" id="artists-shuffle-btn" aria-label="Reproducción aleatoria">
@@ -2969,7 +2966,6 @@
     </div>
     <div class="playlists-tab-panel" id="playlists-tab-liked" style="display:none;">
       <div class="playlists-recent-row" id="liked-recent-row" style="display:none;">
-        <span>↓↑ Recientes</span>
         <button type="button" class="recent-playall-btn" id="liked-playall-btn">▶ Reproducir todas</button>
         <div class="recent-row-actions">
           <button type="button" class="recent-shuffle-btn" id="liked-shuffle-btn" aria-label="Reproducción aleatoria">
@@ -11186,7 +11182,9 @@
         // si la pantalla completa "Reproduciendo ahora" está abierta, también se
         // actualiza su barra (salvo que la persona la esté arrastrando en ese momento)
         if(nowPlayingView.classList.contains('active') && !nowPlayingSeeking && dur > 0){
-          document.getElementById('now-playing-seek').value = Math.round((cur/dur)*1000);
+          const seekPct = Math.min(100, (cur/dur)*100);
+          document.getElementById('now-playing-seek').value = Math.round(seekPct*10);
+          updateNowPlayingSeekFill(seekPct);
           document.getElementById('now-playing-time-current').textContent = formatTime(cur);
           document.getElementById('now-playing-time-total').textContent = formatTime(dur);
         }
@@ -11689,10 +11687,22 @@
     if(currentSong) openArtistShareMenu(songTitleParts(currentSong.title).artist || currentSong.title);
   });
 
+  // pinta en morado la parte ya reproducida de la barra de progreso — un <input
+  // range> no lo hace solo, hay que armar el degradado con corte duro nosotros
+  function updateNowPlayingSeekFill(percent){
+    const input = document.getElementById('now-playing-seek');
+    if(!input) return;
+    const pct = Math.max(0, Math.min(100, percent));
+    input.style.background = `linear-gradient(to right, var(--music-accent) ${pct}%, rgba(255,255,255,.25) ${pct}%)`;
+  }
+
   // barra de progreso arrastrable: mientras la persona la mueve, no se actualiza sola
   let nowPlayingSeeking = false;
   const nowPlayingSeekInput = document.getElementById('now-playing-seek');
-  nowPlayingSeekInput.addEventListener('input', ()=>{ nowPlayingSeeking = true; });
+  nowPlayingSeekInput.addEventListener('input', ()=>{
+    nowPlayingSeeking = true;
+    updateNowPlayingSeekFill((parseInt(nowPlayingSeekInput.value, 10) / parseInt(nowPlayingSeekInput.max, 10)) * 100);
+  });
   nowPlayingSeekInput.addEventListener('change', ()=>{
     if(!globalPlayer) { nowPlayingSeeking = false; return; }
     try{
