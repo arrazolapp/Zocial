@@ -2394,34 +2394,6 @@
   .install-btn.solid{background:linear-gradient(135deg,var(--gold-light),var(--gold));color:#241a05;}
   .install-btn.ghost{background:rgba(255,255,255,.08);color:var(--cream);}
 
-  .permiso-popup{
-    position:fixed;inset:0;z-index:410;
-    display:none;align-items:flex-end;justify-content:center;
-    padding:18px;background:rgba(0,0,0,.45);
-  }
-  .permiso-popup.show{display:flex;}
-  .permiso-card{
-    width:100%;max-width:420px;background:var(--black-2);
-    border:1px solid rgba(217,173,75,.3);border-radius:18px;padding:18px;
-    display:flex;flex-direction:column;gap:14px;
-    box-shadow:0 -10px 40px -10px rgba(0,0,0,.6);
-    transform:translateY(16px);opacity:0;
-    transition:transform .3s ease, opacity .3s ease;
-  }
-  .permiso-popup.show .permiso-card{transform:translateY(0);opacity:1;}
-  .permiso-card-top{display:flex;align-items:center;gap:12px;}
-  .permiso-icon{
-    width:44px;height:44px;border-radius:12px;flex-shrink:0;
-    background:linear-gradient(135deg,var(--gold-light),var(--gold));
-    display:flex;align-items:center;justify-content:center;color:#241a05;
-  }
-  .permiso-icon svg{width:22px;height:22px;}
-  .permiso-text h4{margin:0 0 3px;font-size:14.5px;color:var(--cream);font-family:'Fraunces',serif;font-weight:700;}
-  .permiso-text p{margin:0;font-size:12.5px;color:#cfc6b0;line-height:1.4;}
-  .permiso-actions{display:flex;gap:10px;}
-  .permiso-btn{flex:1;border:none;border-radius:12px;padding:11px;font-weight:700;font-size:13px;cursor:pointer;font-family:'Montserrat',sans-serif;}
-  .permiso-btn.solid{background:linear-gradient(135deg,var(--gold-light),var(--gold));color:#241a05;}
-  .permiso-btn.ghost{background:rgba(255,255,255,.08);color:var(--cream);}
 
   /* ============================================================
      TEMA CLARO — se activa agregando data-theme="light" al <html>.
@@ -2982,7 +2954,7 @@
       <div class="playlist-song-list grid-view" id="liked-songs-list"></div>
       <div class="playlists-empty" id="liked-songs-empty" style="display:none;">
         <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#8f8677" stroke-width="1.6"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>
-        <div>Aún no has guardado canciones.<br>Tócales el ícono 🔖 desde el buscador de música.</div>
+        <div>Aún no has guardado canciones.<br>Tócales el ícono ♡ desde el buscador de música.</div>
       </div>
     </div>
   </div>
@@ -4689,7 +4661,7 @@
     if(musicPickerTab === 'saved' && !songsToShow.length){
       const emptyTab = document.createElement('div');
       emptyTab.className = 'music-picker-tab-empty';
-      emptyTab.textContent = 'Todavía no has guardado ninguna canción. Toca el ícono 🔖 junto a una canción para guardarla aquí.';
+      emptyTab.textContent = 'Todavía no has guardado ninguna canción. Toca el ícono ♡ junto a una canción para guardarla aquí.';
       musicPickerList.appendChild(emptyTab);
     } else if(musicPickerTab === 'foryou' && !MUSIC_LIBRARY.length){
       const empty = document.createElement('div');
@@ -12018,25 +11990,6 @@
 
 </script>
 
-<!-- ===== Pop-up: permisos de cámara/micrófono (necesarios para fotos, video y linterna) ===== -->
-<div id="permiso-popup" class="permiso-popup">
-  <div class="permiso-card">
-    <div class="permiso-card-top">
-      <div class="permiso-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
-      </div>
-      <div class="permiso-text">
-        <h4>Prepara tu experiencia en vivo</h4>
-        <p>Para compartir fotos/video y usar la linterna, danos acceso a tu cámara y micrófono ahora — así no interrumpe nada más tarde.</p>
-      </div>
-    </div>
-    <div class="permiso-actions">
-      <button id="permiso-dismiss" class="permiso-btn ghost">Ahora no</button>
-      <button id="permiso-confirm" class="permiso-btn solid">Permitir acceso</button>
-    </div>
-  </div>
-</div>
-
 <!-- ===== Pop-up: instalar aplicación ===== -->
 <div id="install-popup" class="install-popup">
   <div class="install-card" id="install-card">
@@ -12054,38 +12007,7 @@
   </div>
 </div>
 
-<script>
-  (function(){
-    const permisoPopup = document.getElementById('permiso-popup');
-    const permisoDismiss = document.getElementById('permiso-dismiss');
-    const permisoConfirm = document.getElementById('permiso-confirm');
-    const PERMISO_KEY = 'permisos_solicitados';
 
-    function showPermisoPopup(){
-      if(localStorage.getItem(PERMISO_KEY) === '1') return;
-      permisoPopup.classList.add('show');
-    }
-    function hidePermisoPopup(){
-      permisoPopup.classList.remove('show');
-      localStorage.setItem(PERMISO_KEY, '1');
-    }
-    permisoDismiss.addEventListener('click', hidePermisoPopup);
-    permisoConfirm.addEventListener('click', async ()=>{
-      try{
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        stream.getTracks().forEach(t=>t.stop());
-      }catch(err){
-        console.warn('Permiso de cámara/micrófono no concedido:', err);
-      }
-      hidePermisoPopup();
-    });
-    if(window.__identityReady){
-      setTimeout(showPermisoPopup, 900);
-    } else {
-      window.addEventListener('identity-ready', ()=>setTimeout(showPermisoPopup, 700), {once:true});
-    }
-  })();
-</script>
 
 <script>
   (function(){
