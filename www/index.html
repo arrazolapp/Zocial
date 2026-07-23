@@ -2068,6 +2068,8 @@
   .artist-playlists-grid.list-view .artist-playlist-add-btn{margin-top:0;flex-shrink:0;width:auto;padding:7px 14px;}
 
   /* ---------- vista: detalle de una lista de reproducción ---------- */
+  #playlists-view .content{padding-bottom:96px;}
+  #artist-detail-view .content, #recent-plays-view .content{padding-bottom:96px;}
   #playlist-detail-view .content{padding:14px 16px 40px;}
   .playlist-add-songs-btn{
     display:block;width:100%;background:rgba(255,255,255,.08);border:none;border-radius:12px;
@@ -2899,8 +2901,8 @@
   <div class="playlists-tabs" id="playlists-tabs">
     <button type="button" class="playlists-tab-btn" data-tab="discover">Descubre otras</button>
     <button type="button" class="playlists-tab-btn" data-tab="liked">Tus me gusta</button>
-    <button type="button" class="playlists-tab-btn active" data-tab="mine">Tus Playlist</button>
-    <button type="button" class="playlists-tab-btn" data-tab="artists">Artistas</button>
+    <button type="button" class="playlists-tab-btn" data-tab="mine">Tus Playlist</button>
+    <button type="button" class="playlists-tab-btn active" data-tab="artists">Artistas</button>
   </div>
   <div class="content">
     <div class="playlists-tab-panel" id="playlists-tab-discover" style="display:none;">
@@ -2926,7 +2928,7 @@
     <div class="playlists-empty" id="playlists-search-empty" style="display:none;">
       <div>No se encontró ninguna canción o artista con ese nombre.</div>
     </div>
-    <div class="playlists-tab-panel" id="playlists-tab-mine">
+    <div class="playlists-tab-panel" id="playlists-tab-mine" style="display:none;">
       <div class="playlists-recent-row" id="playlists-recent-row" style="display:none;">
         <span>↓↑ Recientes</span>
         <button type="button" class="recent-playall-btn" id="playlists-playall-btn">▶ Reproducir todas</button>
@@ -2946,10 +2948,14 @@
         <div>Todavía no tienes listas de reproducción.<br>Toca ＋ para crear la primera, o mira la pestaña "Artistas".</div>
       </div>
     </div>
-    <div class="playlists-tab-panel" id="playlists-tab-artists" style="display:none;">
+    <div class="playlists-tab-panel" id="playlists-tab-artists">
       <div class="playlists-recent-row" id="artists-recent-row" style="display:none;">
         <span>↓↑ Recientes</span>
+        <button type="button" class="recent-playall-btn" id="artists-playall-btn">▶ Reproducir todas</button>
         <div class="recent-row-actions">
+          <button type="button" class="recent-shuffle-btn" id="artists-shuffle-btn" aria-label="Reproducción aleatoria">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+          </button>
           <button type="button" class="view-toggle-btn" id="artists-grid-toggle-btn" aria-label="Cambiar vista">
             <svg class="icon-grid" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
             <svg class="icon-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="4" cy="6" r="1.2"/><path d="M8 6h13"/><circle cx="4" cy="12" r="1.2"/><path d="M8 12h13"/><circle cx="4" cy="18" r="1.2"/><path d="M8 18h13"/></svg>
@@ -10169,6 +10175,12 @@
     return songs;
   }
 
+  // todas las canciones de la librería (sin repetir), para el botón "Reproducir
+  // todas" de la pestaña "Artistas" — es el mismo set que se agrupa por artista ahí
+  function getAllArtistsSongsFlat(){
+    return MUSIC_LIBRARY.map(s=>({ id:s.id, title:s.title }));
+  }
+
   // conecta un botón "▶ Reproducir todas" y su botón de aleatorio para cualquier
   // pestaña que tenga una lista plana de canciones — se le pasa una función que
   // devuelve esa lista al momento de tocar el botón (siempre la más actual)
@@ -10539,6 +10551,7 @@
   wirePlayAllAndShuffle('discover-playall-btn', 'discover-shuffle-btn', getUngroupedDiscoverSongs, { type:'discover', name:'Descubre otras', cover:null });
   wirePlayAllAndShuffle('liked-playall-btn', 'liked-shuffle-btn', getLikedSongsList, { type:'liked', name:'Tus me gusta', cover:null });
   wirePlayAllAndShuffle('playlists-playall-btn', 'playlists-shuffle-btn', getAllPlaylistsSongsFlat, { type:'playlist', name:'Tus Playlist', cover:null });
+  wirePlayAllAndShuffle('artists-playall-btn', 'artists-shuffle-btn', getAllArtistsSongsFlat, { type:'artists', name:'Artistas', cover:null });
 
   // ---------- buscador de canciones/artistas dentro de "Tu música" ----------
   const playlistsSearchBtn = document.getElementById('playlists-search-btn');
@@ -10907,7 +10920,8 @@
       avatarFallback.style.display = 'flex';
     }
     if(!musicLibraryLoaded){ await loadMusicLibrary(); }
-    renderPlaylistsList(); // muestra el estado "vacío" de inmediato mientras carga, en vez de nada
+    renderPlaylistsList(); // deja lista la pestaña "Tus Playlist" para cuando se cambie a ella
+    renderArtistPlaylists(); // "Artistas" es la pestaña por defecto al abrir "Tu música"
     if(playlistsUnsub){ return; } // ya está escuchando en vivo, no hace falta suscribirse otra vez
     const user = await waitForAuthUser();
     const myUid = user ? user.uid : null;
