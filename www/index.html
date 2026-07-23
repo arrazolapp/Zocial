@@ -9931,6 +9931,19 @@
     return `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/mqdefault.jpg`;
   }
 
+  // cadena de fuentes alternativas para la miniatura de un video: mismo
+  // contenido, distinto dominio/tamaño — si la primera falla, se intenta la
+  // siguiente antes de rendirse
+  function playlistThumbUrlFallbacks(videoId){
+    const id = encodeURIComponent(videoId);
+    return [
+      `https://img.youtube.com/vi/${id}/mqdefault.jpg`,
+      `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,   // mismo contenido, otro dominio de YouTube
+      `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+      `https://i.ytimg.com/vi/${id}/default.jpg`,      // la más liviana — casi siempre existe
+    ];
+  }
+
   // la carátula del artista es su foto real de perfil de YouTube (guardada por el
   // administrador al agregar la canción) — si una canción vieja no la tiene todavía,
   // usa la miniatura del primer video como respaldo, para que nunca quede sin imagen
@@ -9965,6 +9978,58 @@
     const withChannelPic = songs.find(s=>s.channelThumbnail);
     if(withChannelPic && !artistName) return withChannelPic.channelThumbnail;
     return playlistThumbUrl(songs[0].id);
+  }
+
+  // misma lógica que artistCoverUrl, pero devuelve TODAS las fuentes posibles en
+  // orden de preferencia — para poder ir probando la siguiente si la anterior
+  // falla, en vez de rendirnos con "imagen no disponible" a la primera
+  function artistCoverUrlList(songs, artistName){
+    const list = [];
+    let fallbackVideoId = songs[0].id;
+    if(artistName){
+      const key = normalizeArtistKey(artistName);
+      const primarySong = songs.find(s => {
+        const names = parseArtistNamesFromTitle(s.title);
+        return names[0] && normalizeArtistKey(names[0]) === key;
+      });
+      if(primarySong){
+        fallbackVideoId = primarySong.id;
+        if(primarySong.channelThumbnail) list.push(primarySong.channelThumbnail);
+      } else {
+        const songWithFeaturedPhoto = songs.find(s => s.featuredArtistPhotos &&
+          Object.keys(s.featuredArtistPhotos).some(n => normalizeArtistKey(n) === key));
+        if(songWithFeaturedPhoto){
+          const matchKey = Object.keys(songWithFeaturedPhoto.featuredArtistPhotos).find(n => normalizeArtistKey(n) === key);
+          list.push(songWithFeaturedPhoto.featuredArtistPhotos[matchKey]);
+        }
+      }
+    } else {
+      const withChannelPic = songs.find(s=>s.channelThumbnail);
+      if(withChannelPic) list.push(withChannelPic.channelThumbnail);
+    }
+    list.push(...playlistThumbUrlFallbacks(fallbackVideoId));
+    return list;
+  }
+
+  // intenta cargar una imagen probando una lista de URLs en orden — pasa a la
+  // siguiente automáticamente si la anterior falla, y solo si TODAS fallan
+  // muestra el aviso de "no disponible" en vez de dejar el ícono roto
+  function loadImageWithFallbacks(imgEl, urlList, loadingEl){
+    let i = 0;
+    function tryNext(){
+      if(i >= urlList.length){
+        if(loadingEl){
+          loadingEl.classList.add('load-failed');
+          const label = loadingEl.querySelector('span');
+          if(label) label.textContent = 'Imagen no disponible';
+        }
+        return;
+      }
+      imgEl.src = urlList[i++];
+    }
+    imgEl.addEventListener('load', ()=>{ imgEl.classList.add('is-loaded'); });
+    imgEl.addEventListener('error', tryNext);
+    tryNext();
   }
 
   // ---------- corazón de "me gusta" reutilizable, para cualquier fila de canción
@@ -10155,14 +10220,7 @@
       const card = tpl.content.cloneNode(true).querySelector('.artist-playlist-card');
       const coverImg = card.querySelector('.artist-playlist-cover-img');
       const coverLoading = card.querySelector('.artist-playlist-cover-loading');
-      coverImg.addEventListener('load', ()=>{ coverImg.classList.add('is-loaded'); }, {once:true});
-      coverImg.addEventListener('error', ()=>{
-        // si la imagen falla, NO la mostramos (se vería el ícono roto nativo) —
-        // dejamos el aviso, pero quieto y con otro texto en vez de "Cargando"
-        coverLoading.classList.add('load-failed');
-        coverLoading.querySelector('span').textContent = 'Imagen no disponible';
-      }, {once:true});
-      coverImg.src = artistCoverUrl(artistGroup.songs, artistGroup.name);
+      loadImageWithFallbacks(coverImg, artistCoverUrlList(artistGroup.songs, artistGroup.name), coverLoading);
       card.querySelector('.artist-playlist-name').textContent = artistGroup.name;
       card.querySelector('.artist-playlist-meta').textContent = `${artistGroup.songs.length} ${artistGroup.songs.length===1?'canción':'canciones'}`;
       const addBtn = card.querySelector('[data-action="add-artist-playlist"]');
@@ -10234,7 +10292,7 @@
   async function openArtistDetail(artistGroup){
     showView(artistDetailView);
     const songsSorted = [...artistGroup.songs].sort((a,b)=> (b.views||0) - (a.views||0));
-    document.getElementById('artist-detail-hero-img').src = artistCoverUrl(songsSorted, artistGroup.name);
+    loadImageWithFallbacks(document.getElementById('artist-detail-hero-img'), artistCoverUrlList(songsSorted, artistGroup.name), null);
     document.getElementById('artist-detail-name').textContent = artistGroup.name;
     document.getElementById('artist-detail-meta').textContent = `${songsSorted.length} ${songsSorted.length===1?'canción':'canciones'}`;
 
