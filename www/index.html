@@ -1860,7 +1860,7 @@
     background:linear-gradient(180deg,#3a2440 0%,#1c1420 45%,var(--black) 100%);
     min-height:100vh;
   }
-  .now-playing-scroll{padding:0 20px 50px;}
+  .now-playing-scroll{padding:0 20px 150px;}
   .now-playing-header{
     display:flex;align-items:center;justify-content:space-between;padding:16px 0 8px;color:#fff;
   }
@@ -4179,7 +4179,7 @@
   const bottomNav = document.getElementById('bottom-nav');
   const allViews = [shareView, galleryView, top10View, searchView, profileView, followListView, reelsView, collectionView, editProfileView, messagesView, chatView, playlistsView, playlistDetailView, artistDetailView, recentPlaysView, accountStatsView, musicSettingsView, playbackSettingsView, nowPlayingView];
   // vistas donde el menú inferior debe mostrarse
-  const NAV_VISIBLE_VIEWS = new Set([galleryView, top10View, searchView, profileView, reelsView, collectionView, editProfileView, messagesView, playlistsView, playlistDetailView, artistDetailView, recentPlaysView, accountStatsView, musicSettingsView, playbackSettingsView]);
+  const NAV_VISIBLE_VIEWS = new Set([galleryView, top10View, searchView, profileView, reelsView, collectionView, editProfileView, messagesView, playlistsView, playlistDetailView, artistDetailView, recentPlaysView, accountStatsView, musicSettingsView, playbackSettingsView, nowPlayingView]);
   const bnButtons = {
     gallery: document.getElementById('bn-home'),
     reels: document.getElementById('bn-reels'),
