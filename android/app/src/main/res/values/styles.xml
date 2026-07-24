@@ -1,27 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
+    <!-- Tema base. OJO: por cómo funciona Android, este tema NO es el que se
+         usa mientras la app corre — el que manda es AppTheme.NoActionBar de
+         abajo, porque declara su propio "parent". Por eso los colores de las
+         barras del sistema van repetidos en los dos. -->
+    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
-        <!-- la barra de estado (arriba) y la barra de navegación (abajo) del
-             sistema, del mismo tono oscuro que el resto de la app, con íconos
-             claros porque el fondo es oscuro -->
+        <item name="android:windowBackground">@color/colorPrimaryDark</item>
         <item name="android:statusBarColor">@color/colorPrimaryDark</item>
         <item name="android:navigationBarColor">@color/colorPrimaryDark</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
 
-    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!-- ESTE es el tema que la app usa de verdad (Capacitor lo activa apenas
+         termina la pantalla de bienvenida).
+         Antes heredaba de "DayNight", que se vuelve BLANCO cuando el celular
+         está en modo claro — de ahí las franjas blancas arriba y abajo. Ahora
+         hereda de un tema fijo y todo queda oscuro sin importar el modo del
+         sistema. -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-        <item name="android:background">@null</item>
-    </style>
 
+        <!-- fondo de la ventana en el mismo negro de la app: es lo que se ve
+             detrás/alrededor del contenido, incluidas las franjas del sistema -->
+        <item name="android:windowBackground">@color/colorPrimaryDark</item>
+
+        <!-- barra de estado (arriba, con la hora y la batería) y barra de
+             navegación (abajo, con los botones) del mismo negro -->
+        <item name="android:statusBarColor">@color/colorPrimaryDark</item>
+        <item name="android:navigationBarColor">@color/colorPrimaryDark</item>
+
+        <!-- "false" = íconos CLAROS (blancos), que es lo correcto sobre fondo
+             oscuro; así se vuelven a ver la hora y la batería -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- evita que Android le ponga por su cuenta una capa translúcida
+             encima a las barras (haría que no coincidiera el tono) -->
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+
+        <!-- Android 15 en adelante ignora los colores de arriba y fuerza el
+             modo "borde a borde". Esto pide expresamente NO hacer eso, para que
+             las barras respeten el color que fijamos. -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
