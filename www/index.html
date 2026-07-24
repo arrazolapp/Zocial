@@ -11291,6 +11291,76 @@
     backgroundModeEnabled = false;
   }
 
+  // ============================================================
+  // "Modo reposo" mientras suena música (solo APK): como el video de YouTube se
+  // pausa si la pantalla se APAGA de verdad, hacemos lo que hace una laptop:
+  // la pantalla se queda encendida (KeepAwake) pero, tras 1 minuto sin tocarla,
+  // se baja el brillo al mínimo y se cubre con una capa negra — casi no gasta
+  // batería ni calienta, y la música sigue. Al tocar la pantalla, vuelve todo
+  // a la normalidad.
+  // ============================================================
+  function getKeepAwakePlugin(){ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.KeepAwake; }
+  function getBrightnessPlugin(){ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenBrightness; }
+
+  const REST_MODE_IDLE_MS = 60000; // 1 minuto sin tocar la pantalla
+  let restModeTimer = null;
+  let restModeActive = false;   // pantalla atenuada ahora mismo
+  let keepAwakeActive = false;  // pantalla "despierta" porque hay música sonando
+
+  const restModeOverlay = document.createElement('div');
+  restModeOverlay.id = 'rest-mode-overlay';
+  restModeOverlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483647;display:none;';
+  document.body.appendChild(restModeOverlay);
+
+  function enterRestMode(){
+    if(restModeActive || !isNativeApp() || !globalIsPlaying) return;
+    restModeActive = true;
+    restModeOverlay.style.display = 'block';
+    const sb = getBrightnessPlugin();
+    if(sb) sb.setBrightness({ brightness: 0 }).catch(()=>{});
+  }
+  function exitRestMode(){
+    clearTimeout(restModeTimer);
+    if(restModeActive){
+      restModeActive = false;
+      restModeOverlay.style.display = 'none';
+      const sb = getBrightnessPlugin();
+      // -1 en Android = volver al brillo que la persona tenía configurado
+      if(sb) sb.setBrightness({ brightness: -1 }).catch(()=>{});
+    }
+    // el contador de inactividad solo corre mientras hay música sonando
+    if(keepAwakeActive){
+      restModeTimer = setTimeout(enterRestMode, REST_MODE_IDLE_MS);
+    }
+  }
+  // cualquier toque despierta la pantalla y reinicia el contador. El overlay
+  // además se traga ese primer toque para que no active nada por debajo
+  restModeOverlay.addEventListener('touchstart', (e)=>{ e.preventDefault(); e.stopPropagation(); exitRestMode(); }, {passive:false});
+  ['touchstart','pointerdown','keydown','scroll'].forEach(evt=>{
+    window.addEventListener(evt, ()=>{ if(keepAwakeActive) exitRestMode(); }, {passive:true});
+  });
+
+  // vigila el estado de la música cada pocos segundos y prende/apaga todo el
+  // mecanismo según corresponda — más simple y robusto que engancharse a cada
+  // punto del reproductor
+  if(isNativeApp()){
+    setInterval(()=>{
+      const shouldBeAwake = !!(currentSong && globalIsPlaying);
+      if(shouldBeAwake === keepAwakeActive) return;
+      keepAwakeActive = shouldBeAwake;
+      const ka = getKeepAwakePlugin();
+      if(shouldBeAwake){
+        if(ka) ka.keepAwake().catch(()=>{});
+        clearTimeout(restModeTimer);
+        restModeTimer = setTimeout(enterRestMode, REST_MODE_IDLE_MS);
+      } else {
+        if(ka) ka.allowSleep().catch(()=>{});
+        exitRestMode();
+        clearTimeout(restModeTimer);
+      }
+    }, 3000);
+  }
+
   // crea/recrea la tarjeta de controles de bloqueo con la canción que suena
   // ahora — se llama cada vez que CAMBIA la canción (no en cada pausa)
   function syncLockScreenControls(){
